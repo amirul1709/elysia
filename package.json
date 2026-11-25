@@ -7,7 +7,7 @@
   },
   "dependencies": {
     "@elysia/openapi": "^1.4.17",
-    "elysia": "latest"
+    "elysia": "1.4.30"
   },
   "devDependencies": {
     "bun-types": "latest"
