@@ -118,6 +118,34 @@ const app = new Elysia({ prefix: "/api/v1" })
     },
     { params: t.Object({ id: t.Number() }) },
   )
+  .put(
+    "/campaigns/:id",
+    (context) => {
+      const campaign = db
+        .query(
+          `
+        UPDATE campaigns SET name = ?, due_date = ?, WHERE campaign_id = ?
+        RETURNING campaign_id AS campaignId, name, due_date AS dueDate, created_at AS createdAt    
+    `,
+        )
+        .get(
+          context.body.name,
+          context.body.dueDate ?? null,
+          context.params.id,
+        );
+      if (campaign) {
+        return { data: campaign };
+      }
+      return context.status(404);
+    },
+    {
+      params: t.Object({ id: t.Number() }),
+      body: t.Object({
+        name: t.String(),
+        dueDate: t.Optional(t.String({ format: "date" })),
+      }),
+    },
+  )
   .listen(3000);
 
 console.log(
