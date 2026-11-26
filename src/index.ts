@@ -1,57 +1,32 @@
 import { Elysia, t } from "elysia";
 import openapi from "@elysia/openapi";
 import { Database } from "bun:sqlite";
+import { campaigns } from "./schema";
+import * as schema from "./schema";
+import { drizzle } from "drizzle-orm/bun-sql";
 
-const db = new Database("campaigns.db");
+const db = drizzle(process.env.DATABASE_URL!, { schema, casing: "snake_case" });
 
-db.run(`
-    CREATE TABLE IF NOT EXISTS campaigns
-    (
-        campaign_id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT NOT NULL,
-        due_date TEXT,
-        created_at TEXT NOT NULL
-    )
-`);
-
-if (!db.query(`SELECT 1 FROM campaigns`).get()) {
-  db.run(
-    `
-        INSERT INTO campaigns (name, created_at)
-        VALUES (?, ?)
-    `,
-    ["Cyber Monday", new Date().toISOString()],
-  );
-}
-/*
-const campaigns = [
-    {
-        campaignId: 1,
-        name: "Summer Sale",
-        dueDate: new Date(),
-        createdAt: new Date(),
-    },
-    {
-        campaignId: 2,
-        name: "Black Friday",
-        dueDate: new Date(),
-        createdAt: new Date(),
-    },
-];
-*/
 const app = new Elysia({ prefix: "/api/v1" })
   .use(openapi())
+  .onError((context) => {
+    if (context.code === "NOT_FOUND") {
+      return context.status(404, { error: "Not found" });
+    }
+    if (context.code === "VALIDATION") {
+      return context.status(422, { error: "Bad request data" });
+    }
+
+    console.error(context.error);
+
+    return context.status(500, {
+      error: "Something went wrong, try again later.",
+    });
+  })
   .get("/", () => "Hello Elysia")
-  .get("/campaigns", () => {
+  .get("/campaigns", async () => {
     return {
-      data: db
-        .query(
-          `
-            SELECT campaign_id AS campaignId, name, due_date AS dueDate, created_at AS createdAt 
-            FROM campaigns
-          `,
-        )
-        .all(),
+      data: await db.select().from(campaigns),
     };
   })
   .get(
@@ -124,7 +99,8 @@ const app = new Elysia({ prefix: "/api/v1" })
       const campaign = db
         .query(
           `
-        UPDATE campaigns SET name = ?, due_date = ?, WHERE campaign_id = ?
+        UPDATE campaigns SET name = ?, due_date = ? 
+        WHERE campaign_id = ?
         RETURNING campaign_id AS campaignId, name, due_date AS dueDate, created_at AS createdAt    
     `,
         )
