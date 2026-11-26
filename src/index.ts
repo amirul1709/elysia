@@ -1,28 +1,27 @@
 import { Elysia, t } from "elysia";
 import openapi from "@elysia/openapi";
-import { Database } from "bun:sqlite";
 import { campaigns } from "./schema";
 import * as schema from "./schema";
 import { drizzle } from "drizzle-orm/bun-sql";
+import { eq } from "drizzle-orm";
+import { createInsertSchema } from "drizzle-typebox";
 
 const db = drizzle(process.env.DATABASE_URL!, { schema, casing: "snake_case" });
 
+const _insertCampaign = createInsertSchema(campaigns, {
+  dueDate: (schema) => t.String({ ...schema, format: "date" }),
+});
+const campaignBody = t.Omit(_insertCampaign, ["campaignId", "createdAt"]);
+
 const app = new Elysia({ prefix: "/api/v1" })
   .use(openapi())
-  .onError((context) => {
-    if (context.code === "NOT_FOUND") {
-      return context.status(404, { error: "Not found" });
-    }
-    if (context.code === "VALIDATION") {
-      return context.status(422, { error: "Bad request data" });
-    }
-
-    console.error(context.error);
-
-    return context.status(500, {
-      error: "Something went wrong, try again later.",
-    });
-  })
+  // .onError(({ code, error, status }) => {
+  //     if (code === 'NOT_FOUND') return status(404, { error: 'Not Found' });
+  //     if (code === 'VALIDATION')
+  //         return status(422, { error: 'Bad request data' });
+  //     console.error(error);
+  //     return status(500, { error: 'Something went wrong, try again later' });
+  // })
   .get("/", () => "Hello Elysia")
   .get("/campaigns", async () => {
     return {
@@ -31,95 +30,64 @@ const app = new Elysia({ prefix: "/api/v1" })
   })
   .get(
     "/campaigns/:id",
-    (context) => {
-      const campaign = db
-        .query(
-          `
-            SELECT campaign_id AS campaignId, name, due_date AS dueDate, created_at AS createdAt 
-            FROM campaigns
-            WHERE campaign_id = ?
-        `,
-        )
-        .get(context.params.id);
+    async (context) => {
+      const [campaign] = await db
+        .select()
+        .from(campaigns)
+        .where(eq(campaigns.campaignId, context.params.id));
       if (!campaign) {
-        return context.status(
-          404,
-          `No campaigns found with id ${context.params.id}`,
-        );
+        return context.status(404);
       }
       return { data: campaign };
     },
-    { params: t.Object({ id: t.Number() }) },
+    {
+      params: t.Object({ id: t.Number() }),
+    },
   )
   .post(
     "/campaigns",
-    (context) => {
-      const campaign = db
-        .query(
-          `
-        INSERT INTO campaigns (name, due_date, created_at)
-        VALUES (?, ?, ?)
-        RETURNING campaign_id AS campaignId, name, due_date AS dueDate, created_at AS createdAs
-    `,
-        )
-        .get(
-          context.body.name,
-          context.body.dueDate ?? null,
-          new Date().toISOString(),
-        );
+    async (context) => {
+      const [campaign] = await db
+        .insert(campaigns)
+        .values(context.body)
+        .returning();
       return context.status(201, { data: campaign });
     },
     {
-      body: t.Object({
-        name: t.String(),
-        dueDate: t.Optional(t.String({ format: "date" })),
-      }),
+      body: campaignBody,
     },
   )
   .delete(
     "/campaigns/:id",
-    (context) => {
-      const { changes } = db.run(
-        `
-        DELETE FROM campaigns WHERE campaign_id = ?    
-    `,
-        [context.params.id],
-      );
-
-      if (changes) {
-        return context.status(204);
-      }
-      return context.status(404);
+    async (context) => {
+      const deleted = await db
+        .delete(campaigns)
+        .where(eq(campaigns.campaignId, context.params.id))
+        .returning();
+      if (deleted.length === 0) return context.status(404);
+      return context.status(204);
     },
     { params: t.Object({ id: t.Number() }) },
   )
   .put(
     "/campaigns/:id",
-    (context) => {
-      const campaign = db
-        .query(
-          `
-        UPDATE campaigns SET name = ?, due_date = ? 
-        WHERE campaign_id = ?
-        RETURNING campaign_id AS campaignId, name, due_date AS dueDate, created_at AS createdAt    
-    `,
-        )
-        .get(
-          context.body.name,
-          context.body.dueDate ?? null,
-          context.params.id,
-        );
-      if (campaign) {
-        return { data: campaign };
-      }
-      return context.status(404);
+    async (context) => {
+      const [campaign] = await db
+        .update(campaigns)
+        .set({
+          name: context.body.name,
+          dueDate: context.body.dueDate ?? null,
+        })
+
+        .where(eq(campaigns.campaignId, context.params.id))
+        .returning();
+
+      if (!campaign) return context.status(404);
+      return { data: campaign };
     },
     {
       params: t.Object({ id: t.Number() }),
-      body: t.Object({
-        name: t.String(),
-        dueDate: t.Optional(t.String({ format: "date" })),
-      }),
+      body: campaignBody,
     },
   )
   .listen(3000);
