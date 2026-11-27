@@ -25,19 +25,19 @@ TypeScript, PostgreSQL, and Drizzle ORM.
 bun install
 ```
 
-1. Create a `.env` file:
+2. Create a `.env` file:
 
 ```dotenv
 DATABASE_URL=postgresql://username:password@localhost:5432/omnicopy
 ```
 
-1. Create the campaigns table with the Drizzle schema:
+3. Create the campaigns table with the Drizzle schema:
 
 ```bash
 bunx drizzle-kit push
 ```
 
-1. Start the development server:
+4. Start the development server:
 
 ```bash
 bun run dev
