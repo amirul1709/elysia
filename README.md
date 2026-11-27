@@ -25,19 +25,19 @@ TypeScript, PostgreSQL, and Drizzle ORM.
 bun install
 ```
 
-2. Create a `.env` file:
+1. Create a `.env` file:
 
 ```dotenv
 DATABASE_URL=postgresql://username:password@localhost:5432/omnicopy
 ```
 
-3. Create the campaigns table with the Drizzle schema:
+1. Create the campaigns table with the Drizzle schema:
 
 ```bash
 bunx drizzle-kit push
 ```
 
-4. Start the development server:
+1. Start the development server:
 
 ```bash
 bun run dev
@@ -50,7 +50,7 @@ The API is available at `http://localhost:3000/api/v1`.
 OpenAPI documentation is served by the application when it is running.
 
 | Method | Endpoint | Description |
-|---|---|---|
+| --- | --- | --- |
 | `GET` | `/api/v1/` | Welcome response |
 | `GET` | `/api/v1/campaigns` | List all campaigns |
 | `GET` | `/api/v1/campaigns/:id` | Get one campaign |
@@ -108,7 +108,7 @@ curl -X DELETE http://localhost:3000/api/v1/campaigns/1
 The `campaigns` table contains:
 
 | Column | Type | Constraints |
-|---|---|---|
+| --- | --- | --- |
 | `campaign_id` | integer / serial | Primary key |
 | `name` | text | Not null |
 | `due_date` | date | Optional |
